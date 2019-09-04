@@ -15,10 +15,13 @@ img_file = os.path.join(os.getcwd(), "Images")
 img_file_list = os.listdir(img_file)
 
 
+# returns a filtered image and unfiltered image. This is needed for white lines on green grass
 def image_seg_opencv():
     kernel = np.ones((3, 3), np.uint8)
 
-    img = cv2.imread(os.path.join(img_file,img_file_list[0]))
+    img = cv2.imread(os.path.join(img_file, img_file_list[0]))
+    # used as refernce images
+    og_image = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
     result = img.copy()
     img = cv2.cvtColor(img, cv2.COLOR_BGR2HSV)
     # create a lower bound for a pixel value
@@ -39,18 +42,24 @@ def image_seg_opencv():
 
     gradient = cv2.morphologyEx(mask, cv2.MORPH_GRADIENT, kernel)
 
-    cv2.imshow('mask', mask)
-    cv2.imshow('result', result)
-    cv2.imshow('opening_test', gradient)
-    cv2.waitKey()
+    plt.imshow(result)
+    plt.show()
 
-def white_line_on_road_driver():
-    # images I'm using are 540x960x3
-    height = 540
-    width = 960
+    # cv2.imshow('mask', mask)
+    # cv2.imshow('result', result)
+    # cv2.imshow('opening_test', gradient)
+    # cv2.waitKey()
 
+    return result, og_image
+
+
+def white_line_on_road_driver(image, og_image):
     # read in desired image
-    image = mpimg.imread(os.path.join(img_file, img_file_list[2]))
+    # image = mpimg.imread(os.path.join(img_file, img_file_list[2]))
+
+    # gives the height and width of the image from the dimensions given
+    height = image.shape[0]
+    width = image.shape[1]
 
     # printing out some stats and plotting the image
     # print('This image is:', type(image), 'with dimensions:', image.shape)
@@ -59,7 +68,7 @@ def white_line_on_road_driver():
 
     region_of_interest_vertices = [
         (0, height),
-        (width / 2, height / 2),
+        (width / 2, height / 2 + 45),
         (width, height),
     ]
 
@@ -76,10 +85,18 @@ def white_line_on_road_driver():
     # crop operation at the end of the cannyed pipeline so cropped edge doesn't get detected
     cropped_image = region_of_interest(cannyed_image, np.array([region_of_interest_vertices], np.int32))
 
+    plt.figure()
+    plt.imshow(cropped_image)
+    plt.show()
+
+    # used houghlinesP algo to detect the white lines
+    # use threshold=152 for road side image. Test out different stuff for grassy images
     lines = cv2.HoughLinesP(cropped_image, rho=6, theta=np.pi / 60, threshold=152,
                             lines=np.array([]), minLineLength=40, maxLineGap=25)
 
-    line_image = draw_lines(image, lines)
+    line_image = draw_lines(og_image, lines)
+
+    # this code is needed when we know we have two lanes on the left or right side of the images.
 
     # left_line_x = []
     # left_line_y = []
@@ -116,11 +133,12 @@ def white_line_on_road_driver():
     #
     # right_x_start = int(poly_right(max_y))
     # right_x_end = int(poly_right(min_y))
+    #
     # line_image = draw_lines(
     #     image,
     #     [[
-    #         [left_x_start, max_y, left_x_end, min_y],
-    #         [right_x_start, max_y, right_x_end, min_y],
+    #         [left_x_start, max_y, left_x_end, int(min_y)],
+    #         [right_x_start, max_y, right_x_end, int(min_y)],
     #     ]],
     # )
 
@@ -169,6 +187,39 @@ def draw_lines(img, lines, color=[255,0,0], thickness=3):
     return img
 
 
+def crop_images():
+
+    # read in desired image
+    image = mpimg.imread(os.path.join(img_file, img_file_list[2]))
+
+    # images I'm using are 540x960x3
+    height = image.shape[0]
+    width = image.shape[1]
+
+    region_of_interest_vertices = [
+        (0, height),
+        (width / 2, height / 2 + 45),
+        (width, height),
+    ]
+
+    plt.figure()
+    plt.imshow(image)
+    plt.show()
+
+    # convert to grayscale
+    gray_image = cv2.cvtColor(image, cv2.COLOR_RGB2GRAY)
+
+    # crop operation at the end of the cannyed pipeline so cropped edge doesn't get detected
+    cropped_image = region_of_interest(gray_image, np.array([region_of_interest_vertices], np.int32))
+
+    plt.figure()
+    plt.imshow(cropped_image)
+    plt.show()
+
+
 if __name__ == '__main__':
-    #image_seg_opencv()
-    white_line_on_road_driver()
+    #image = mpimg.imread(os.path.join(img_file, img_file_list[2]))
+    images = image_seg_opencv()
+    white_line_on_road_driver(images[0], images[1])
+    #white_line_on_road_driver(image, image)
+    #crop_images()
