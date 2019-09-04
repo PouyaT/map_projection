@@ -14,37 +14,34 @@ img_file_list = os.listdir(img_file)
 
 
 def image_seg_opencv():
+    kernel = np.ones((3, 3), np.uint8)
+
     img = cv2.imread(os.path.join(img_file,img_file_list[0]))
-    edges = cv2.Canny(img, 400, 400)
+    result = img.copy()
+    img = cv2.cvtColor(img, cv2.COLOR_BGR2HSV)
+    # create a lower bound for a pixel value
+    lower = np.array([0, 0, 200])
+    # create an upper bound for a pixel values
+    upper = np.array([179, 77, 255])
+    # detects all white pixels wihin the range specified earlier
+    mask = cv2.inRange(img, lower, upper)
+    result = cv2.bitwise_and(result, result, mask=mask)
 
-    plt.subplot(121), plt.imshow(img, cmap='gray')
-    plt.title('Original Image'), plt.xticks([]), plt.yticks([])
-    plt.subplot(122), plt.imshow(edges, cmap='gray')
-    plt.title('Edge Image'), plt.xticks([]), plt.yticks([])
+    cnts = cv2.findContours(mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+    cnts = cnts[0] if len(cnts) == 2 else cnts[1]
 
-    plt.show()
+    for c in cnts:
+        area = cv2.contourArea(c)
+        if area < 1:
+            cv2.drawContours(result, [c], -1, (0, 0, 0), -1)
 
+    gradient = cv2.morphologyEx(mask, cv2.MORPH_GRADIENT, kernel)
 
-def image_seg_watershed():
-    img = cv2.imread(os.path.join(img_file,img_file_list[0]))
-    gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
-    ret, thresh = cv2.threshold(gray, 0, 255, cv2.THRESH_BINARY_INV + cv2.THRESH_OTSU)
-    plt.subplot(121), plt.imshow(thresh)
-    plt.show()
-
-
-def image_seg_skimage():
-    img = io.imread((os.path.join(img_file, img_file_list[0])))
-    grayscale = color.rgb2gray(img)
-
-    global_thresh = filters.threshold_otsu(grayscale)
-    binary_global = grayscale > global_thresh
-    plt.imshow(binary_global)
-    plt.show()
+    cv2.imshow('mask', mask)
+    cv2.imshow('result', result)
+    cv2.imshow('opening_test', gradient)
+    cv2.waitKey()
 
 
 if __name__ == '__main__':
-    print((os.path.join(img_file, img_file_list[0])))
-    #image_seg_opencv()
-    image_seg_watershed()
-    #image_seg_skimage()
+    image_seg_opencv()
