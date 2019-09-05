@@ -4,15 +4,14 @@ import numpy as np
 import matplotlib.image as mpimg
 from matplotlib import pyplot as plt
 import math
-from PIL import Image
-from skimage.feature import canny
-from skimage import io
-from skimage import color
-from skimage import feature
-from skimage import filters
+from moviepy.editor import VideoFileClip
+from IPython.display import HTML
 
 img_file = os.path.join(os.getcwd(), "Images")
 img_file_list = os.listdir(img_file)
+
+video_file = os.path.join(os.getcwd(), "Videos")
+video_file_list = os.listdir(video_file)
 
 
 # returns a filtered image and unfiltered image. This is needed for white lines on green grass
@@ -53,7 +52,8 @@ def image_seg_opencv():
     return result, og_image
 
 
-def white_line_on_road_driver(image, og_image):
+# takes in the filered image and the og image to place red lines on top of
+def pipeline(image):
     # read in desired image
     # image = mpimg.imread(os.path.join(img_file, img_file_list[2]))
 
@@ -61,10 +61,29 @@ def white_line_on_road_driver(image, og_image):
     height = image.shape[0]
     width = image.shape[1]
 
+    # print(width, height)
+
     # printing out some stats and plotting the image
     # print('This image is:', type(image), 'with dimensions:', image.shape)
     # plt.imshow(image)
-    # plt.show()
+    # plt.show().
+
+    # curvy road test width-50
+    # region_of_interest_vertices = [
+    #     (0, height),
+    #     (width / 2 - 10, height / 2 + 50),
+    #     (width - 50, height),
+    # ]
+
+    # using the first one for the hd highway video to for propper crop
+
+    # region_of_interest_vertices = [
+    #     (300, height),
+    #     (width / 2 + 100, height / 2 + 280),
+    #     (width * .8, height),
+    # ]
+
+    # used for non-hd video
 
     region_of_interest_vertices = [
         (0, height),
@@ -72,9 +91,9 @@ def white_line_on_road_driver(image, og_image):
         (width, height),
     ]
 
-    plt.figure()
-    plt.imshow(image)
-    plt.show()
+    # plt.figure()
+    # plt.imshow(image)
+    # plt.show()
 
     # convert to grayscale
     gray_image = cv2.cvtColor(image, cv2.COLOR_RGB2GRAY)
@@ -91,10 +110,10 @@ def white_line_on_road_driver(image, og_image):
 
     # used houghlinesP algo to detect the white lines
     # use threshold=152 for road side image. Test out different stuff for grassy images
-    lines = cv2.HoughLinesP(cropped_image, rho=6, theta=np.pi / 60, threshold=152,
+    lines = cv2.HoughLinesP(cropped_image, rho=6, theta=np.pi / 60, threshold=75,
                             lines=np.array([]), minLineLength=40, maxLineGap=25)
 
-    line_image = draw_lines(og_image, lines)
+    line_image = draw_lines(image, lines)
 
     # this code is needed when we know we have two lanes on the left or right side of the images.
 
@@ -142,10 +161,13 @@ def white_line_on_road_driver(image, og_image):
     #     ]],
     # )
 
-    plt.figure()
-    plt.imshow(line_image)
+    # print(line_image)
 
-    plt.show()
+    # plt.figure()
+    # plt.imshow(line_image)
+    # plt.show()
+
+    return line_image
 
 
 def region_of_interest(img, vertices):
@@ -164,7 +186,7 @@ def region_of_interest(img, vertices):
     return masked_image
 
 
-def draw_lines(img, lines, color=[255,0,0], thickness=3):
+def draw_lines(img, lines, color = [255,0,0], thickness=3):
     # If there are no lines to draw, exit
     if lines is None:
         return
@@ -190,7 +212,7 @@ def draw_lines(img, lines, color=[255,0,0], thickness=3):
 def crop_images():
 
     # read in desired image
-    image = mpimg.imread(os.path.join(img_file, img_file_list[2]))
+    image = mpimg.imread(os.path.join(img_file, img_file_list[0]))
 
     # images I'm using are 540x960x3
     height = image.shape[0]
@@ -198,9 +220,15 @@ def crop_images():
 
     region_of_interest_vertices = [
         (0, height),
-        (width / 2, height / 2 + 45),
-        (width, height),
+        (width / 2 - 25, height / 2 + 50),
+        (width - 175, height),
     ]
+
+    # region_of_interest_vertices = [
+    #     (0, height),
+    #     (width / 2 - 150, height / 2 + 200),
+    #     (width - 450, height),
+    # ]
 
     plt.figure()
     plt.imshow(image)
@@ -218,8 +246,15 @@ def crop_images():
 
 
 if __name__ == '__main__':
-    #image = mpimg.imread(os.path.join(img_file, img_file_list[2]))
-    images = image_seg_opencv()
-    white_line_on_road_driver(images[0], images[1])
-    #white_line_on_road_driver(image, image)
-    #crop_images()
+    # image = mpimg.imread(os.path.join(img_file, img_file_list[5]))
+    # print(image)
+    # pipeline(image)
+    # images = image_seg_opencv()
+    # white_line_on_road_driver(image, image)
+    # crop_images()
+    video = os.path.join(video_file, video_file_list[0])
+    print(video)
+    white_output = 'curved_road_partial_output.mp4'
+    clip1 = VideoFileClip(video)
+    white_clip = clip1.fl_image(pipeline)
+    white_clip.write_videofile(white_output, audio=False)
