@@ -3,6 +3,7 @@ import cv2
 import numpy as np
 import matplotlib.image as mpimg
 from matplotlib import pyplot as plt
+import statistics
 import math
 from moviepy.editor import VideoFileClip
 from IPython.display import HTML
@@ -12,6 +13,9 @@ img_file_list = os.listdir(img_file)
 
 video_file = os.path.join(os.getcwd(), "Videos")
 video_file_list = os.listdir(video_file)
+
+# use this as a queue. enqueue: list.append() deque: list.pop(0)
+glob_avg_x_loc = list()
 
 
 # returns a filtered image and unfiltered image. This is needed for white lines on green grass
@@ -75,11 +79,11 @@ def pipeline(image):
     #     (width - 50, height),
     # ]
 
-    # using the first one for the hd highway video to for propper crop
+    # using for the hd highway video to for propper crop
 
     # region_of_interest_vertices = [
     #     (300, height),
-    #     (width / 2 + 100, height / 2 + 280),
+    #     (width / 2 + 100, height / 2 + 300),
     #     (width * .8, height),
     # ]
 
@@ -87,7 +91,7 @@ def pipeline(image):
 
     region_of_interest_vertices = [
         (0, height),
-        (width / 2, height / 2 + 45),
+        (width / 2, height / 2 + 70),
         (width, height),
     ]
 
@@ -104,9 +108,9 @@ def pipeline(image):
     # crop operation at the end of the cannyed pipeline so cropped edge doesn't get detected
     cropped_image = region_of_interest(cannyed_image, np.array([region_of_interest_vertices], np.int32))
 
-    plt.figure()
-    plt.imshow(cropped_image)
-    plt.show()
+    # plt.figure()
+    # plt.imshow(cropped_image)
+    # plt.show()
 
     # used houghlinesP algo to detect the white lines
     # use threshold=152 for road side image. Test out different stuff for grassy images
@@ -161,11 +165,14 @@ def pipeline(image):
     #     ]],
     # )
 
-    # print(line_image)
+    # gets the centered x location of the current frame
+    frame_x_loc = current_x_loc(lines)
 
-    # plt.figure()
-    # plt.imshow(line_image)
-    # plt.show()
+    plt.figure()
+    plt.imshow(line_image)
+    plt.show()
+
+    desired_loc(frame_x_loc)
 
     return line_image
 
@@ -244,17 +251,84 @@ def crop_images():
     plt.imshow(cropped_image)
     plt.show()
 
+    # takes in a list of coordinates that are lines
+
+# takes in a list of lines and figures out the current x loc of the frame
+def current_x_loc(lines):
+    left_line_x = []
+    left_line_y = []
+    right_line_x = []
+    right_line_y = []
+
+    for line in lines:
+        for x1, y1, x2, y2 in line:
+            slope = (y2 - y1) / (x2 - x1)  # <-- Calculating the slope.
+            if slope <= 0:  # <-- If the slope is negative, left group.
+                left_line_x.extend([x1, x2])
+                left_line_y.extend([y1, y2])
+            else:  # <-- Otherwise, right group.
+                right_line_x.extend([x1, x2])
+                right_line_y.extend([y1, y2])
+
+    # find average x and y coordinates of each side of the line
+    try:
+        right_line_x_med = statistics.median(right_line_x)
+        right_line_y_med = statistics.median(right_line_y)
+        left_line_x_med = statistics.median(left_line_x)
+        left_line_y_med = statistics.median(left_line_y)
+
+        # gets min values of each x/y coordinates of each sides of the line
+        right_line_min_x = min(right_line_x)
+        right_line_min_y = min(right_line_y)
+        left_line_min_x = min(left_line_x)
+        left_line_min_y = min(left_line_y)
+
+        # distance between lines
+        x_dist = math.fabs(right_line_min_x - left_line_min_x)
+        y_dist = math.fabs(right_line_min_y - left_line_min_y)
+
+        # get the average value of the min values for left and right line
+        # may need to add a counterweight with median value on a more consistent line set
+        min_x_avg = (right_line_min_x + left_line_min_x) / 2
+        min_y_avg = (right_line_min_y + left_line_min_y) / 2
+    except statistics.StatisticsError:
+        # returns a -1 which is normally impossible to return
+        return -1
+
+    return min_x_avg
+
+
+def desired_loc(curr_x_loc):
+    # catches the -1 and returns nothing and ends the function
+    if curr_x_loc == -1:
+        return None
+    # makes sure there ar at least 15 values in the list before doing turn evaluation
+    if len(glob_avg_x_loc) < 15:
+        glob_avg_x_loc.append(curr_x_loc)
+        print('list to short')
+    # print out which direction the robot should be going and update the lit (que)
+    else:
+        avg_x = statistics.mean(glob_avg_x_loc)
+        if curr_x_loc > avg_x:
+            print('turn right dif is: ', curr_x_loc - avg_x)
+            glob_avg_x_loc.pop(0)
+            glob_avg_x_loc.append(curr_x_loc)
+        elif curr_x_loc < avg_x:
+            print('turn left dif is: ', curr_x_loc - avg_x)
+            glob_avg_x_loc.pop(0)
+            glob_avg_x_loc.append(curr_x_loc)
+
 
 if __name__ == '__main__':
     # image = mpimg.imread(os.path.join(img_file, img_file_list[5]))
-    # print(image)
     # pipeline(image)
     # images = image_seg_opencv()
     # white_line_on_road_driver(image, image)
     # crop_images()
-    video = os.path.join(video_file, video_file_list[0])
+    video = os.path.join(video_file, video_file_list[3])
     print(video)
     white_output = 'curved_road_partial_output.mp4'
     clip1 = VideoFileClip(video)
     white_clip = clip1.fl_image(pipeline)
     white_clip.write_videofile(white_output, audio=False)
+
