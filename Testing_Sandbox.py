@@ -20,7 +20,7 @@ glob_avg_y_loc = list()
 
 
 # returns a filtered image and unfiltered image. This is needed for white lines on green grass
-# outputs are numpy arrays
+# output are two images, First output is the filtered image, Second output is the original pre-filtered image
 def image_seg_opencv(og_image):
     kernel = np.ones((3, 3), np.uint8)
 
@@ -55,10 +55,19 @@ def image_seg_opencv(og_image):
     return result, og_image
 
 
-# takes in the filtered image and the og image to place red lines on top of
-def pipeline(pre_or_post_filtered_image, original_overlay_image):
-    # read in desired image
-    # image = mpimg.imread(os.path.join(img_file, img_file_list[2]))
+# takes in an image and outputs an image that has redlines overlaying the detected boundries
+def pipeline(image):
+
+    # for white lines on grassy photos need this part for pre-processing before being able to
+    # detect white lines
+    # img_list = image_seg_opencv(image)
+    # pre_or_post_filtered_image = img_list[0]
+    # original_overlay_image = img_list[1]
+
+    # need this if testing on actual roads with white lines borders
+    pre_or_post_filtered_image = image
+    original_overlay_image = image
+
 
     # gives the height and width of the image from the dimensions given
     height = image.shape[0]
@@ -337,15 +346,14 @@ def desired_loc(curr_x_loc, curr_y_loc):
 
 
 if __name__ == '__main__':
-    image = mpimg.imread(os.path.join(img_file, img_file_list[4]))
-    img_list = image_seg_opencv(image)
-    pipeline(img_list[0], img_list[1])
+    # image = mpimg.imread(os.path.join(img_file, img_file_list[4]))
+    # pipeline(image)
     # crop_images()
     # images = image_seg_opencv()
-    # video = os.path.join(video_file, video_file_list[3])
-    # print(video)
-    # white_output = 'curved_road_partial_output.mp4'
-    # clip1 = VideoFileClip(video)
-    # white_clip = clip1.fl_image(pipeline)
-    # white_clip.write_videofile(white_output, audio=False)
+    video = os.path.join(video_file, video_file_list[3])
+    print(video)
+    white_output = 'curved_road_partial_output.mp4'
+    clip1 = VideoFileClip(video)
+    white_clip = clip1.fl_image(pipeline)
+    white_clip.write_videofile(white_output, audio=False)
 
