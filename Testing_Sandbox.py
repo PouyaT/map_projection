@@ -68,7 +68,6 @@ def pipeline(image):
     pre_or_post_filtered_image = image
     original_overlay_image = image
 
-
     # gives the height and width of the image from the dimensions given
     height = image.shape[0]
     width = image.shape[1]
@@ -81,7 +80,6 @@ def pipeline(image):
     # ]
 
     # using for the hd highway video to for propper crop
-
     # region_of_interest_vertices = [
     #     (300, height),
     #     (width / 2 + 100, height / 2 + 300),
@@ -89,16 +87,11 @@ def pipeline(image):
     # ]
 
     # used for non-hd video
-
     region_of_interest_vertices = [
         (0, height),
         (width / 2, height / 2 + 70),
         (width, height),
     ]
-
-    # plt.figure()
-    # plt.imshow(image)
-    # plt.show()
 
     # convert to grayscale
     gray_image = cv2.cvtColor(pre_or_post_filtered_image, cv2.COLOR_RGB2GRAY)
@@ -109,10 +102,6 @@ def pipeline(image):
     # crop operation at the end of the cannyed pipeline so cropped edge doesn't get detected
     cropped_image = region_of_interest(cannyed_image, np.array([region_of_interest_vertices], np.int32))
 
-    # plt.figure()
-    # plt.imshow(cropped_image)
-    # plt.show()
-
     # used houghlinesP algo to detect the white lines
     # use threshold=152 for road side image. Test out different stuff for grassy images
     lines = cv2.HoughLinesP(cropped_image, rho=6, theta=np.pi / 60, threshold=75,
@@ -120,62 +109,14 @@ def pipeline(image):
 
     line_image = draw_lines(original_overlay_image, lines)
 
-    # this code is needed when we know we have two lanes on the left or right side of the images.
-
-    # left_line_x = []
-    # left_line_y = []
-    # right_line_x = []
-    # right_line_y = []
-    #
-    # for line in lines:
-    #     for x1, y1, x2, y2 in line:
-    #         slope = (y2 - y1) / (x2 - x1)  # <-- Calculating the slope.
-    #         if math.fabs(slope) < 0.5:  # <-- Only consider extreme slope
-    #             continue
-    #         if slope <= 0:  # <-- If the slope is negative, left group.
-    #             left_line_x.extend([x1, x2])
-    #             left_line_y.extend([y1, y2])
-    #         else:  # <-- Otherwise, right group.
-    #             right_line_x.extend([x1, x2])
-    #             right_line_y.extend([y1, y2])
-    #
-    # min_y = image.shape[0] * (3 / 5)  # <-- Just below the horizon
-    # max_y = image.shape[0]  # <-- The bottom of the image
-    # poly_left = np.poly1d(np.polyfit(
-    #     left_line_y,
-    #     left_line_x,
-    #     deg=1
-    # ))
-    #
-    # left_x_start = int(poly_left(max_y))
-    # left_x_end = int(poly_left(min_y))
-    # poly_right = np.poly1d(np.polyfit(
-    #     right_line_y,
-    #     right_line_x,
-    #     deg=1
-    # ))
-    #
-    # right_x_start = int(poly_right(max_y))
-    # right_x_end = int(poly_right(min_y))
-    #
-    # line_image = draw_lines(
-    #     image,
-    #     [[
-    #         [left_x_start, max_y, left_x_end, int(min_y)],
-    #         [right_x_start, max_y, right_x_end, int(min_y)],
-    #     ]],
-    # )
-
     # gets the centered x and y location of the current frame
     frame_x_loc, frame_y_loc = current_x_n_y_loc(lines)
 
-    print(lines)
+    map_localization(lines, width, height)
 
     plt.figure()
     plt.imshow(line_image)
     plt.show()
-
-    desired_loc(frame_x_loc, frame_y_loc)
 
     return line_image
 
@@ -199,7 +140,7 @@ def region_of_interest(img, vertices):
 
 # teaks in an image, a list of lines from HoughedLinesP and draws red lines on top of the passed in image
 # outputs the images
-def draw_lines(img, lines, color = [255,0,0], thickness=3):
+def draw_lines(img, lines, color=[255,0,0], thickness=3):
     # If there are no lines to draw, exit
     if lines is None:
         return
@@ -262,6 +203,7 @@ def crop_images():
 
 
 # takes in a list of lines and figures out the current x loc and y loc of the frame
+# not needed for SLAM for now
 def current_x_n_y_loc(lines):
     left_line_x = []
     left_line_y = []
@@ -310,6 +252,7 @@ def current_x_n_y_loc(lines):
 
 # takes in the current x and y location and sees if they differ from the avg location from the previous 15
 # frames to see if the a turn is required or not
+# not actually related right now
 # TODO test out this method idk how accurate this is if at all
 def desired_loc(curr_x_loc, curr_y_loc):
     # gets current angle (in degrees)
@@ -345,15 +288,89 @@ def desired_loc(curr_x_loc, curr_y_loc):
             glob_avg_y_loc.append(curr_y_loc)
 
 
+# the if statement that determines what is left or right lane will need to change based on video footage
+def map_localization(lines, width, height):
+    x_left_list = []
+    x_right_list = []
+    y_left_list = []
+    y_right_list = []
+
+    x_left_list_r = []
+    x_right_list_r = []
+    y_left_list_r = []
+    y_right_list_r = []
+
+    # r stands for rounded value
+    # I add 50 to guarantee that it will round up to the neared hundreds
+    width_r = int(round_up(width, -2))
+    height_r = int(round_up(height, -2))
+
+    print(width_r, height_r)
+
+    # populates two lists with x and y values
+    for line in lines:
+        for x1, y1, x2, y2 in line:
+            # if the x location of the pixel is less than 500 then it's the left line
+            # this if statement will need to change based on video footage
+            if x1 < 500:
+                x_left_list.extend([x1, x2])
+                y_left_list.extend([y1, y2])
+            else:
+                x_right_list.extend([x1, x2])
+                y_right_list.extend([y1, y2])
+
+    # makes sure the list isn't empty before trying to round
+    # creating np arrays from original right and left line lists
+    # then using np's built in functions to round
+    # and turning them back into normal lists
+    if len(x_right_list) > 0:
+        x_right_list_r = list(np.around(np.array(x_right_list), -2))
+        y_right_list_r = list(np.around(np.array(y_right_list), -2))
+
+    if len(x_left_list) > 0:
+        x_left_list_r = list(np.around(np.array(x_left_list), -2))
+        y_left_list_r = list(np.around(np.array(y_left_list), -2))
+
+    # creates a 2d array of 6x10 (in this particular case) (row x column)
+    data_map = np.zeros(shape=(int(height_r / 100), int(width_r / 100)), dtype=int)
+    print(data_map.shape)
+
+    print(x_right_list_r)
+    print(y_right_list_r)
+    print(x_left_list_r)
+    print(y_left_list_r)
+
+    # error checking
+    if len(x_right_list) > 0:
+        # loops through the x and y coordinates and places a 1 on the map representing the line from the image
+        for row in y_right_list_r:
+            for col in x_right_list_r:
+                data_map[int(row/100)][int(col/100)] = 1
+
+    if len(x_left_list) > 0:
+        for row in y_left_list_r:
+            for col in x_left_list_r:
+                data_map[int(row/100)][int(col/100)] = 1
+
+    plt.imshow(data_map)
+    plt.show()
+
+
+# created my own helper function to round up numbers
+def round_up(n, decimals):
+    multiplier = 10 ** decimals
+    return math.ceil(n * multiplier) / multiplier
+
+
 if __name__ == '__main__':
-    # image = mpimg.imread(os.path.join(img_file, img_file_list[4]))
-    # pipeline(image)
+    image = mpimg.imread(os.path.join(img_file, img_file_list[5]))
+    pipeline(image)
     # crop_images()
-    # images = image_seg_opencv()
-    video = os.path.join(video_file, video_file_list[3])
-    print(video)
-    white_output = 'curved_road_partial_output.mp4'
-    clip1 = VideoFileClip(video)
-    white_clip = clip1.fl_image(pipeline)
-    white_clip.write_videofile(white_output, audio=False)
+    # # images = image_seg_opencv()
+    # video = os.path.join(video_file, video_file_list[3])
+    # print(video)
+    # white_output = 'curved_road_partial_output.mp4'
+    # clip1 = VideoFileClip(video)
+    # white_clip = clip1.fl_image(pipeline)
+    # white_clip.write_videofile(white_output, audio=False)
 
