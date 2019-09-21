@@ -21,7 +21,7 @@ Input Videos and corresponding output Videos are in files. If you're interested 
 </p>
 
 # Post-Processed Videos
-![](Output_Images/white_line_highway_with_cars.gif)
-![](Output_Images/white_line_highway_without_cars.gif)
+![](Output_Videos/white_line_highway_with_cars.gif)
+![](Output_Videos/white_line_highway_without_cars.gif)
 
 
