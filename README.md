@@ -20,3 +20,8 @@ Input Videos and corresponding output Videos are in files. If you're interested 
   <img src="/Output_Images/white_line_on_road.png" width="450"/> 
 </p>
 
+# Post-Processed Videos
+![](Output_Images/white_line_highway_with_cars.gif)
+![](Output_Images/white_line_highway_without_cars.gif)
+
+
