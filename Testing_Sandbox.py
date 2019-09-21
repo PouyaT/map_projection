@@ -112,7 +112,10 @@ def pipeline(image):
     # gets the centered x and y location of the current frame
     frame_x_loc, frame_y_loc = current_x_n_y_loc(lines)
 
-    map_localization(lines, width, height)
+    # creates how fine/detailed the 2D map will be
+    scale = -1
+    divider = 10
+    map_localization(lines, width, height, scale, divider)
 
     plt.figure()
     plt.imshow(line_image)
@@ -289,7 +292,8 @@ def desired_loc(curr_x_loc, curr_y_loc):
 
 
 # the if statement that determines what is left or right lane will need to change based on video footage
-def map_localization(lines, width, height):
+def map_localization(lines, width, height, scale, divider):
+
     x_left_list = []
     x_right_list = []
     y_left_list = []
@@ -302,10 +306,10 @@ def map_localization(lines, width, height):
 
     # r stands for rounded value
     # I add 50 to guarantee that it will round up to the neared hundreds
-    width_r = int(round_up(width, -2))
-    height_r = int(round_up(height, -2))
+    width_r = int(round_up(width, scale))
+    height_r = int(round_up(height, scale))
 
-    print(width_r, height_r)
+    print(height_r, width_r)
 
     # populates two lists with x and y values
     for line in lines:
@@ -323,36 +327,60 @@ def map_localization(lines, width, height):
     # creating np arrays from original right and left line lists
     # then using np's built in functions to round
     # and turning them back into normal lists
+    # woek on this ,aybe go back to what i had
     if len(x_right_list) > 0:
-        x_right_list_r = list(np.around(np.array(x_right_list), -2))
-        y_right_list_r = list(np.around(np.array(y_right_list), -2))
+        x_right_list_r = list(np.trunc(np.array(x_right_list)) / divider)
+        y_right_list_r = list(np.trunc(np.array(y_right_list)) / divider)
 
     if len(x_left_list) > 0:
-        x_left_list_r = list(np.around(np.array(x_left_list), -2))
-        y_left_list_r = list(np.around(np.array(y_left_list), -2))
+        x_left_list_r = list(np.trunc(np.array(x_left_list)) / divider)
+        y_left_list_r = list(np.trunc(np.array(y_left_list)) / divider)
 
     # creates a 2d array of 6x10 (in this particular case) (row x column)
-    data_map = np.zeros(shape=(int(height_r / 100), int(width_r / 100)), dtype=int)
-    print(data_map.shape)
+    data_map = np.zeros(shape=(int(height_r / divider), int(width_r / divider)), dtype=int)
 
-    print(x_right_list_r)
-    print(y_right_list_r)
-    print(x_left_list_r)
-    print(y_left_list_r)
+    # gets the average of the x on the left and right sides
+    x_right_list_avg = round_up(statistics.mean(x_right_list_r), scale)
+
+    x_left_list_avg = round_up(statistics.mean(x_left_list_r), scale)
+
+    print(*y_right_list)
+    print(*y_left_list)
+
 
     # error checking
     if len(x_right_list) > 0:
         # loops through the x and y coordinates and places a 1 on the map representing the line from the image
         for row in y_right_list_r:
-            for col in x_right_list_r:
-                data_map[int(row/100)][int(col/100)] = 1
+            # for col in x_right_list_r:
+            #     data_map[int(row/100)][int(col/100)] = 1
+            print(int(row // divider), row, divider)
+            data_map[int(row//divider)][int(x_right_list_avg//divider)] = 1
 
+    # populates left side of the map
     if len(x_left_list) > 0:
         for row in y_left_list_r:
-            for col in x_left_list_r:
-                data_map[int(row/100)][int(col/100)] = 1
+            # for col in x_left_list_r:
+            #     data_map[int(row/100)][int(col/100)] = 1int(x_right_list_avg/divider)
+            print(int(row//divider))
+            data_map[int(row//divider)][int(x_left_list_avg//divider)] = 1
 
-    plt.imshow(data_map)
+    # if len(x_right_list) > 0:
+    #     x_right_list_avg = int(statistics.mean(x_right_list_r))
+    #     y_right_list_avg = int(statistics.mean(y_right_list_r))
+    #     x_right_list_avg = round_up(x_right_list_avg, -2)
+    #     y_right_list_avg = round_up(y_right_list_avg, -2)
+    #     print(x_right_list_avg, y_right_list_avg)
+    #     data_map[int(y_right_list_avg/100)][int(x_right_list_avg/100)] = 1
+    # if len(x_left_list) > 0:
+    #     x_left_list_avg = int(statistics.mean(x_left_list_r))
+    #     y_left_list_avg = int(statistics.mean(y_left_list_r))
+    #     x_left_list_avg = round_up(x_left_list_avg, -2)
+    #     y_left_list_avg = round_up(y_left_list_avg, -2)
+    #     print(x_left_list_avg, y_left_list_avg)
+    #     data_map[int(y_left_list_avg/100)][int(x_left_list_avg/100)] = 1
+
+    plt.imshow(data_map, extent=(0, data_map.shape[1], 0, data_map.shape[0]))
     plt.show()
 
 
