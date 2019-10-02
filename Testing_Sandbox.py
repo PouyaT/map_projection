@@ -39,7 +39,7 @@ def image_seg_opencv(og_image):
     mask = cv2.inRange(img, lower, upper)
     result = cv2.bitwise_and(result, result, mask=mask)
 
-    cnts = cv2.findContours(mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+    cnts = cv2.findContours(mask, cv2.RETR_EXTERpip NAL, cv2.CHAIN_APPROX_SIMPLE)
     cnts = cnts[0] if len(cnts) == 2 else cnts[1]
 
     for c in cnts:
