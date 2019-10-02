@@ -1,12 +1,17 @@
 import os
 import cv2
 import numpy as np
+import matplotlib
+#matplotlib.use('Agg')
 import matplotlib.image as mpimg
 from matplotlib import pyplot as plt
 import statistics
 import math
 from moviepy.editor import VideoFileClip
 from IPython.display import HTML
+import imageio
+
+counter = 0
 
 img_file = os.path.join(os.getcwd(), "Input_Images")
 img_file_list = os.listdir(img_file)
@@ -117,9 +122,10 @@ def pipeline(image):
     divider = 100
     map_localization(lines, width, height, scale, divider)
 
-    plt.figure()
-    plt.imshow(line_image)
-    plt.show()
+    # # this is to display images for testing purpose
+    # plt.figure()
+    # plt.imshow(line_image)
+    # plt.show()
 
     return line_image
 
@@ -337,40 +343,29 @@ def map_localization(lines, width, height, scale, divider):
     # creates a 2d array of 6x10 (in this particular case) (row x column)
     data_map = np.zeros(shape=(int(height_r / divider), int(width_r / divider)), dtype=int)
 
-    # gets the average of the x on the left and right sides
-    # I'm doing this so I can get a consistent line
-    x_right_list_avg =statistics.mean(x_right_list_r)
-
-    x_left_list_avg = statistics.mean(x_left_list_r)
-
     # error checking
     if len(x_right_list) > 0:
+        # gets the average of the x on the left and right sides
+        # I'm doing this so I can get a consistent line
+        x_right_list_avg =statistics.mean(x_right_list_r)
         # loops through the x and y coordinates and places a 1 on the map representing the line from the image
         for row in y_right_list_r:
             data_map[int(row)][int(x_right_list_avg)] = 1
 
     # populates left side of the map
     if len(x_left_list) > 0:
+        x_left_list_avg = statistics.mean(x_left_list_r)
         for row in y_left_list_r:
             data_map[int(row)][int(x_left_list_avg)] = 1
 
-    # if len(x_right_list) > 0:
-    #     x_right_list_avg = int(statistics.mean(x_right_list_r))
-    #     y_right_list_avg = int(statistics.mean(y_right_list_r))
-    #     x_right_list_avg = round_up(x_right_list_avg, -2)
-    #     y_right_list_avg = round_up(y_right_list_avg, -2)
-    #     print(x_right_list_avg, y_right_list_avg)
-    #     data_map[int(y_right_list_avg/100)][int(x_right_list_avg/100)] = 1
-    # if len(x_left_list) > 0:
-    #     x_left_list_avg = int(statistics.mean(x_left_list_r))
-    #     y_left_list_avg = int(statistics.mean(y_left_list_r))
-    #     x_left_list_avg = round_up(x_left_list_avg, -2)
-    #     y_left_list_avg = round_up(y_left_list_avg, -2)
-    #     print(x_left_list_avg, y_left_list_avg)
-    #     data_map[int(y_left_list_avg/100)][int(x_left_list_avg/100)] = 1
-
+    # this aves all the images to the particular file directory
+    global counter
+    fig = plt.figure()
     plt.imshow(data_map, extent=(0, data_map.shape[1], 0, data_map.shape[0]))
-    plt.show()
+    image_file_name = 'Map_Images/MAP' + str(counter)
+    plt.savefig(image_file_name)
+    plt.close(fig)
+    counter += 1
 
 
 # created my own helper function to round up numbers
@@ -379,15 +374,33 @@ def round_up(n, decimals):
     return math.ceil(n * multiplier) / multiplier
 
 
+# turning the Map_Images directory into a set a video
+def frames_to_videos():
+    map_file = os.path.join(os.getcwd(), "Map_Images")
+    map_file_list = os.listdir(map_file)
+
+    writer = imageio.get_writer('test.mp4', fps=27)
+
+    for im in map_file_list:
+        writer.append_data(imageio.imread(os.path.join(map_file, im)))
+    writer.close()
+
+
+
+
+
 if __name__ == '__main__':
-    image = mpimg.imread(os.path.join(img_file, img_file_list[5]))
-    pipeline(image)
+    # image = mpimg.imread(os.path.join(img_file, img_file_list[5]))
+    # pipeline(image)
     # crop_images()
-    # # images = image_seg_opencv()
+    # images = image_seg_opencv()
+
     # video = os.path.join(video_file, video_file_list[3])
     # print(video)
-    # white_output = 'curved_road_partial_output.mp4'
+    # white_output = 'Highway_Video_with_cars.mp4'
     # clip1 = VideoFileClip(video)
     # white_clip = clip1.fl_image(pipeline)
     # white_clip.write_videofile(white_output, audio=False)
+
+    frames_to_videos()
 
