@@ -12,6 +12,8 @@ from IPython.display import HTML
 import imageio
 
 counter = 0
+scale = -1
+divider = 10
 
 img_file = os.path.join(os.getcwd(), "Input_Images")
 img_file_list = os.listdir(img_file)
@@ -23,10 +25,12 @@ video_file_list = os.listdir(video_file)
 glob_avg_x_loc = list()
 glob_avg_y_loc = list()
 
+grass_image = False
+
 
 # returns a filtered image and unfiltered image. This is needed for white lines on green grass
 # output are two images, First output is the filtered image, Second output is the original pre-filtered image
-def image_seg_opencv(og_image):
+def grass_filter(og_image):
     kernel = np.ones((3, 3), np.uint8)
 
     result = og_image.copy()
@@ -39,7 +43,7 @@ def image_seg_opencv(og_image):
     mask = cv2.inRange(img, lower, upper)
     result = cv2.bitwise_and(result, result, mask=mask)
 
-    cnts = cv2.findContours(mask, cv2.RETR_EXTERpip NAL, cv2.CHAIN_APPROX_SIMPLE)
+    cnts = cv2.findContours(mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
     cnts = cnts[0] if len(cnts) == 2 else cnts[1]
 
     for c in cnts:
@@ -63,15 +67,16 @@ def image_seg_opencv(og_image):
 # takes in an image and outputs an image that has redlines overlaying the detected boundries
 def pipeline(image):
 
-    # for white lines on grassy photos need this part for pre-processing before being able to
-    # detect white lines
-    # img_list = image_seg_opencv(image)
-    # pre_or_post_filtered_image = img_list[0]
-    # original_overlay_image = img_list[1]
-
-    # need this if testing on actual roads with white lines borders
-    pre_or_post_filtered_image = image
-    original_overlay_image = image
+    # flag for seeing if you're dealing with grassy images or not
+    if grass_image:
+        # for white lines on grassy photos need this part for pre-processing before being able to detect white lines
+        img_list = grass_filter(image)
+        pre_or_post_filtered_image = img_list[0]
+        original_overlay_image = img_list[1]
+    else:
+        # need this if testing on actual roads with white lines borders
+        pre_or_post_filtered_image = image
+        original_overlay_image = image
 
     # gives the height and width of the image from the dimensions given
     height = image.shape[0]
@@ -115,12 +120,10 @@ def pipeline(image):
     line_image = draw_lines(original_overlay_image, lines)
 
     # gets the centered x and y location of the current frame
-    frame_x_loc, frame_y_loc = current_x_n_y_loc(lines)
+    # currently not used
+    # frame_x_loc, frame_y_loc = current_x_n_y_loc(lines)
 
-    # creates how fine/detailed the 2D map will be
-    scale = -2
-    divider = 100
-    map_localization(lines, width, height, scale, divider)
+    map_localization(lines, width, height)
 
     # # this is to display images for testing purpose
     # plt.figure()
@@ -213,6 +216,7 @@ def crop_images():
 
 # takes in a list of lines and figures out the current x loc and y loc of the frame
 # not needed for SLAM for now
+# TODO Currently not in use
 def current_x_n_y_loc(lines):
     left_line_x = []
     left_line_y = []
@@ -263,6 +267,7 @@ def current_x_n_y_loc(lines):
 # frames to see if the a turn is required or not
 # not actually related right now
 # TODO test out this method idk how accurate this is if at all
+# TODO Currently not in use
 def desired_loc(curr_x_loc, curr_y_loc):
     # gets current angle (in degrees)
     curr_angle = np.arctan2(curr_x_loc, curr_y_loc) * (180 / np.pi)
@@ -298,7 +303,10 @@ def desired_loc(curr_x_loc, curr_y_loc):
 
 
 # the if statement that determines what is left or right lane will need to change based on video footage
-def map_localization(lines, width, height, scale, divider):
+def map_localization(lines, width, height):
+
+    global scale
+    global divider
 
     x_left_list = []
     x_right_list = []
@@ -314,6 +322,8 @@ def map_localization(lines, width, height, scale, divider):
     # I add 50 to guarantee that it will round up to the neared hundreds
     width_r = int(round_up(width, scale))
     height_r = int(round_up(height, scale))
+    height_r = height_r / divider
+    width_r = width_r / divider
 
     # populates two lists with x and y values
     for line in lines:
@@ -341,16 +351,24 @@ def map_localization(lines, width, height, scale, divider):
         y_left_list_r = list(np.array(y_left_list) / divider)
 
     # creates a 2d array of 6x10 (in this particular case) (row x column)
-    data_map = np.zeros(shape=(int(height_r / divider), int(width_r / divider)), dtype=int)
+    data_map = np.zeros(shape=(int(height_r), int(width_r)), dtype=int)
 
     # error checking
     if len(x_right_list) > 0:
         # gets the average of the x on the left and right sides
         # I'm doing this so I can get a consistent line
-        x_right_list_avg =statistics.mean(x_right_list_r)
+        x_right_list_avg = statistics.mean(x_right_list_r)
         # loops through the x and y coordinates and places a 1 on the map representing the line from the image
         for row in y_right_list_r:
             data_map[int(row)][int(x_right_list_avg)] = 1
+            # checks below the point if it doesn't already exists then fill it
+            if (0 < int(row) - 1 < height_r) and data_map[int(row)][int(x_right_list_avg)] == 1:
+                data_map[int(row) - 1][int(x_right_list_avg)] = 1
+                print('bottom', int(row) - 1)
+
+            if (0 < int(row) + 1 < height_r) and data_map[int(row)][int(x_right_list_avg)] == 1:
+                data_map[int(row) + 1][int(x_right_list_avg)] = 1
+                print('top', int(row) + 1)
 
     # populates left side of the map
     if len(x_left_list) > 0:
@@ -358,21 +376,27 @@ def map_localization(lines, width, height, scale, divider):
         for row in y_left_list_r:
             data_map[int(row)][int(x_left_list_avg)] = 1
 
-    # this aves all the images to the particular file directory
-    global counter
-    fig = plt.figure()
+            # checks below the point if it doesn't already exists then fill it
+            if (0 < int(row) - 1 < height_r) and data_map[int(row)][int(x_left_list_avg)] == 1:
+                data_map[int(row) - 1][int(x_left_list_avg)] = 1
+                print('bottom', int(row) - 1)
+
+            if (0 < int(row) + 1 < height_r) and data_map[int(row)][int(x_left_list_avg)] == 1:
+                data_map[int(row) + 1][int(x_left_list_avg)] = 1
+                print('top', int(row) + 1)
+
     plt.imshow(data_map, extent=(0, data_map.shape[1], 0, data_map.shape[0]))
-    image_file_name = 'Map_Images/MAP' + str(counter)
-    plt.savefig(image_file_name)
-    plt.close(fig)
-    counter += 1
+    plt.show()
 
 
-# created my own helper function to round up numbers
-def round_up(n, decimals):
-    multiplier = 10 ** decimals
-    return math.ceil(n * multiplier) / multiplier
-
+    # # this aves all the images to the particular file directory
+    # global counter
+    # fig = plt.figure()
+    # plt.imshow(data_map, extent=(0, data_map.shape[1], 0, data_map.shape[0]))
+    # image_file_name = 'Map_Images/MAP' + str(counter)
+    # plt.savefig(image_file_name)
+    # plt.close(fig)
+    # counter += 1
 
 # turning the Map_Images directory into a set a video
 def frames_to_videos():
@@ -385,22 +409,31 @@ def frames_to_videos():
         writer.append_data(imageio.imread(os.path.join(map_file, im)))
     writer.close()
 
+# takes in height, angle of the camera, and the field of view so the image can given a reference of a distance
+def length_to_ground(height, angle, field_of_view):
+    while(1):
+        break
 
 
+# created my own helper function to round up numbers
+def round_up(n, decimals):
+    multiplier = 10 ** decimals
+    return math.ceil(n * multiplier) / multiplier
 
 
 if __name__ == '__main__':
+    # white_line_on_roads(resized
     # image = mpimg.imread(os.path.join(img_file, img_file_list[5]))
     # pipeline(image)
     # crop_images()
-    # images = image_seg_opencv()
+    # images = grass_image()
 
-    # video = os.path.join(video_file, video_file_list[3])
-    # print(video)
-    # white_output = 'Highway_Video_with_cars.mp4'
-    # clip1 = VideoFileClip(video)
-    # white_clip = clip1.fl_image(pipeline)
-    # white_clip.write_videofile(white_output, audio=False)
+    video = os.path.join(video_file, video_file_list[3])
+    print(video)
+    white_output = 'Highway_Video_with_cars.mp4'
+    clip1 = VideoFileClip(video)
+    white_clip = clip1.fl_image(pipeline)
+    white_clip.write_videofile(white_output, audio=False)
 
-    frames_to_videos()
+    # frames_to_videos()
 
