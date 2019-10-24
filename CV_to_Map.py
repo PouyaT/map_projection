@@ -263,7 +263,8 @@ def round_up(n, decimals):
 
 
 if __name__ == '__main__':
-    # call pipeline function and subscribe to a string of image data to use
+    # call pipeline function which will return a data_map which is just a 2d numpy array
+    # Need to subscribe to an image node for images data to use
     data_map = pipeline()
 
 
