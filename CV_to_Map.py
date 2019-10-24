@@ -364,14 +364,14 @@ def map_localization(lines, width, height):
         # loops through the x and y coordinates and places a 1 on the map representing the line from the image
         for row in y_right_list_r:
             data_map[int(row)][int(x_right_list_avg)] = 1
-            # checks below the point if it doesn't already exists then fill it
-            if (0 < int(row) - 1 < height_r) and data_map[int(row)][int(x_right_list_avg)] == 1:
-                data_map[int(row) - 1][int(x_right_list_avg)] = 1
-                print('bottom', int(row) - 1)
 
-            if (0 < int(row) + 1 < height_r) and data_map[int(row)][int(x_right_list_avg)] == 1:
-                data_map[int(row) + 1][int(x_right_list_avg)] = 1
-                print('top', int(row) + 1)
+            for i in range(4):
+                # checks i below and above to fill in any gaps that might have been missed
+                if 0 < int(row) - i and data_map[int(row)][int(x_right_list_avg)] == 1:
+                    data_map[int(row) - i][int(x_right_list_avg)] = 1
+
+                if int(row) + i < height_r and data_map[int(row)][int(x_right_list_avg)] == 1:
+                    data_map[int(row) + i][int(x_right_list_avg)] = 1
 
     # populates left side of the map
     if len(x_left_list) > 0:
@@ -379,14 +379,14 @@ def map_localization(lines, width, height):
         for row in y_left_list_r:
             data_map[int(row)][int(x_left_list_avg)] = 1
 
-            # checks below the point if it doesn't already exists then fill it
-            if (0 < int(row) - 1 < height_r) and data_map[int(row)][int(x_left_list_avg)] == 1:
-                data_map[int(row) - 1][int(x_left_list_avg)] = 1
-                print('bottom', int(row) - 1)
+            for i in range(4):
+                # checks i below and above to fill in any gaps that might have been missed
+                if 0 < int(row) - i and data_map[int(row)][int(x_left_list_avg)] == 1:
+                    data_map[int(row) - i][int(x_left_list_avg)] = 1
 
-            if (0 < int(row) + 1 < height_r) and data_map[int(row)][int(x_left_list_avg)] == 1:
-                data_map[int(row) + 1][int(x_left_list_avg)] = 1
-                print('top', int(row) + 1)
+                if int(row) + i < height_r and data_map[int(row)][int(x_left_list_avg)] == 1:
+                    data_map[int(row) + i][int(x_left_list_avg)] = 1
+
 
     plt.imshow(data_map, extent=(0, data_map.shape[1], 0, data_map.shape[0]))
     plt.show()
@@ -403,6 +403,7 @@ def map_localization(lines, width, height):
     # plt.savefig(image_file_name)
     # plt.close(fig)
     # counter += 1
+
 
 # turning the Map_Images directory into a set a video
 def frames_to_videos():
