@@ -7,10 +7,8 @@ import matplotlib.image as mpimg
 from matplotlib import pyplot as plt
 import statistics
 import math
-from moviepy.editor import VideoFileClip
-from IPython.display import HTML
-import imageio
 from skimage.transform import resize
+import rospy
 
 map_size = 200
 counter = 0
@@ -245,15 +243,15 @@ def map_localization(lines, width, height):
 
                 if int(row) + i < height_r and data_map[int(row)][int(x_left_list_avg)] == 1:
                     data_map[int(row) + i][int(x_left_list_avg)] = 1
-    # resizes the image and keeps the ratios the same to the size I want
+    # resize the image and keeps the ratios the same to the size I want
     data_map_resized = resize(data_map, (map_size, map_size))
 
     return data_map_resized
 
-# takes in height, angle of the camera, and the field of view so the image can given a reference of a distance
-def length_to_ground(height, angle, field_of_view):
-    while(1):
-        break
+
+def numpyMap_to_occupancyGrid(data_map):
+    msg = OccupancyGrid(info=MapMetaData(width=200,height=200), data = data_map)
+
 
 
 # created my own helper function to round up numbers
