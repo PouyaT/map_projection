@@ -15,16 +15,6 @@ counter = 0
 scale = -1
 divider = 10
 
-img_file = os.path.join(os.getcwd(), "Input_Images")
-img_file_list = os.listdir(img_file)
-
-video_file = os.path.join(os.getcwd(), "Input_Videos")
-video_file_list = os.listdir(video_file)
-
-# use this as a queue. enqueue: list.append() deque: list.pop(0)
-glob_avg_x_loc = list()
-glob_avg_y_loc = list()
-
 grass_image = False
 
 
@@ -119,18 +109,15 @@ def pipeline(image):
 
     line_image = draw_lines(original_overlay_image, lines)
 
-    # gets the centered x and y location of the current frame
-    # currently not used
-    # frame_x_loc, frame_y_loc = current_x_n_y_loc(lines)
-
-    map_localization(lines, width, height)
+    # takes in the returned value of the map_localization which is a 2d array
+    data_map = map_localization(lines, width, height)
 
     # # this is to display images for testing purpose
     # plt.figure()
     # plt.imshow(line_image)
     # plt.show()
 
-    return line_image
+    return data_map
 
 
 # takes in an image and a list of points (vertices) to crop the image
@@ -173,133 +160,6 @@ def draw_lines(img, lines, color=[255,0,0], thickness=3):
 
     # return the modified image
     return img
-
-
-# testing out cropping mechanism
-def crop_images():
-
-    # read in desired image
-    image = mpimg.imread(os.path.join(img_file, img_file_list[4]))
-
-    # images I'm using are 540x960x3
-    height = image.shape[0]
-    width = image.shape[1]
-
-    region_of_interest_vertices = [
-        (0, height),
-        (width / 2 - 25, height / 2 + 50),
-        (width - 175, height),
-    ]
-
-    # region_of_interest_vertices = [
-    #     (0, height),
-    #     (width / 2 - 150, height / 2 + 200),
-    #     (width - 450, height),
-    # ]
-
-    plt.figure()
-    plt.imshow(image)
-    plt.show()
-
-    # convert to grayscale
-    gray_image = cv2.cvtColor(image, cv2.COLOR_RGB2GRAY)
-
-    # crop operation at the end of the cannyed pipeline so cropped edge doesn't get detected
-    cropped_image = region_of_interest(gray_image, np.array([region_of_interest_vertices], np.int32))
-
-    plt.figure()
-    plt.imshow(cropped_image)
-    plt.show()
-
-    # takes in a list of coordinates that are lines
-
-
-# takes in a list of lines and figures out the current x loc and y loc of the frame
-# not needed for SLAM for now
-# TODO Currently not in use
-def current_x_n_y_loc(lines):
-    left_line_x = []
-    left_line_y = []
-    right_line_x = []
-    right_line_y = []
-
-    for line in lines:
-        for x1, y1, x2, y2 in line:
-            # using the slope might not work for curved lanes. Might just need to split the image in half at
-            # an x pixel point and everything to the left is left side and everything to the right is right side
-            slope = (y2 - y1) / (x2 - x1)  # <-- Calculating the slope.
-            if slope <= 0:  # <-- If the slope is negative, left group.
-                left_line_x.extend([x1, x2])
-                left_line_y.extend([y1, y2])
-            else:  # <-- Otherwise, right group.
-                right_line_x.extend([x1, x2])
-                right_line_y.extend([y1, y2])
-
-    # finds the median x and y coordinates of each side of the line
-    try:
-        right_line_x_med = statistics.median(right_line_x)
-        right_line_y_med = statistics.median(right_line_y)
-        left_line_x_med = statistics.median(left_line_x)
-        left_line_y_med = statistics.median(left_line_y)
-
-        # gets min values of each x/y coordinates of each sides of the line
-        right_line_min_x = min(right_line_x)
-        right_line_min_y = min(right_line_y)
-        left_line_min_x = min(left_line_x)
-        left_line_min_y = min(left_line_y)
-
-        # distance between lines
-        x_dist = math.fabs(right_line_min_x - left_line_min_x)
-        y_dist = math.fabs(right_line_min_y - left_line_min_y)
-
-        # get the average value of the min values for left and right line
-        # may need to add a counterweight with median value on a more consistent line set
-        min_x_avg = (right_line_min_x + left_line_min_x) / 2
-        min_y_avg = (right_line_min_y + left_line_min_y) / 2
-    except statistics.StatisticsError:
-        # returns a -1 which is normally impossible to return
-        return -1, -1
-
-    return min_x_avg, min_y_avg
-
-
-# takes in the current x and y location and sees if they differ from the avg location from the previous 15
-# frames to see if the a turn is required or not
-# not actually related right now
-# TODO test out this method idk how accurate this is if at all
-# TODO Currently not in use
-def desired_loc(curr_x_loc, curr_y_loc):
-    # gets current angle (in degrees)
-    curr_angle = np.arctan2(curr_x_loc, curr_y_loc) * (180 / np.pi)
-
-    # catches the -1 and returns nothing and ends the function
-    if curr_x_loc == -1 or curr_y_loc == -1:
-        return None
-    # makes sure there ar at least 15 values in the list before doing turn evaluation
-    if len(glob_avg_x_loc) < 15 and len(glob_avg_y_loc) < 15:
-        glob_avg_x_loc.append(curr_x_loc)
-        glob_avg_y_loc.append(curr_y_loc)
-        print('list to short')
-    # print out which direction the robot should be going and update the lit (que)
-    else:
-        avg_x = statistics.mean(glob_avg_x_loc)
-        avg_y = statistics.mean(glob_avg_y_loc)
-
-        # gets the average angle of the frames
-        avg_angle = np.arctan2(avg_x, avg_y) * (180 / np.pi)
-
-        if curr_angle > avg_angle:
-            print('turn right dif is: ', curr_angle - avg_angle)
-            glob_avg_x_loc.pop(0)
-            glob_avg_x_loc.append(curr_x_loc)
-            glob_avg_y_loc.pop(0)
-            glob_avg_y_loc.append(curr_y_loc)
-        elif curr_angle < avg_angle:
-            print('turn left dif is: ', curr_angle - avg_angle)
-            glob_avg_x_loc.pop(0)
-            glob_avg_x_loc.append(curr_x_loc)
-            glob_avg_y_loc.pop(0)
-            glob_avg_y_loc.append(curr_y_loc)
 
 
 # the if statement that determines what is left or right lane will need to change based on video footage
@@ -388,26 +248,7 @@ def map_localization(lines, width, height):
     plt.imshow(data_map, extent=(0, data_map.shape[1], 0, data_map.shape[0]))
     plt.show()
 
-
-    # # this aves all the images to the particular file directory
-    # global counter
-    # fig = plt.figure()
-    # plt.imshow(data_map, extent=(0, data_map.shape[1], 0, data_map.shape[0]))
-    # image_file_name = 'Map_Images/MAP' + str(counter)
-    # plt.savefig(image_file_name)
-    # plt.close(fig)
-    # counter += 1
-
-# turning the Map_Images directory into a set a video
-def frames_to_videos():
-    map_file = os.path.join(os.getcwd(), "Map_Images")
-    map_file_list = os.listdir(map_file)
-
-    writer = imageio.get_writer('test.mp4', fps=27)
-
-    for im in map_file_list:
-        writer.append_data(imageio.imread(os.path.join(map_file, im)))
-    writer.close()
+    return data_map
 
 # takes in height, angle of the camera, and the field of view so the image can given a reference of a distance
 def length_to_ground(height, angle, field_of_view):
@@ -422,18 +263,7 @@ def round_up(n, decimals):
 
 
 if __name__ == '__main__':
-    # white_line_on_roads(resized
-    # image = mpimg.imread(os.path.join(img_file, img_file_list[5]))
-    # pipeline(image)
-    # crop_images()
-    # images = grass_image()
+    # call pipeline function and subscribe to a string of image data to use
+    data_map = pipeline()
 
-    video = os.path.join(video_file, video_file_list[3])
-    print(video)
-    white_output = 'Highway_Video_with_cars.mp4'
-    clip1 = VideoFileClip(video)
-    white_clip = clip1.fl_image(pipeline)
-    white_clip.write_videofile(white_output, audio=False)
-
-    # frames_to_videos()
 
