@@ -10,6 +10,9 @@ import math
 from moviepy.editor import VideoFileClip
 from IPython.display import HTML
 import imageio
+from skimage.transform import resize
+
+map_size = 200
 
 counter = 0
 scale = -1
@@ -304,7 +307,7 @@ def desired_loc(curr_x_loc, curr_y_loc):
 
 # the if statement that determines what is left or right lane will need to change based on video footage
 def map_localization(lines, width, height):
-
+    global map_size
     global scale
     global divider
 
@@ -388,6 +391,9 @@ def map_localization(lines, width, height):
     plt.imshow(data_map, extent=(0, data_map.shape[1], 0, data_map.shape[0]))
     plt.show()
 
+    data_map_resized = resize(data_map, (map_size, map_size))
+    plt.imshow(data_map, extent=(0, data_map_resized.shape[1], 0, data_map_resized.shape[0]))
+    plt.show()
 
     # # this aves all the images to the particular file directory
     # global counter
@@ -422,7 +428,7 @@ def round_up(n, decimals):
 
 
 if __name__ == '__main__':
-    # white_line_on_roads(resized
+    # white_line_on_roads(resized)
     # image = mpimg.imread(os.path.join(img_file, img_file_list[5]))
     # pipeline(image)
     # crop_images()
