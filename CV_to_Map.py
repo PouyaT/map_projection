@@ -387,7 +387,6 @@ def map_localization(lines, width, height):
                 if int(row) + i < height_r and data_map[int(row)][int(x_left_list_avg)] == 1:
                     data_map[int(row) + i][int(x_left_list_avg)] = 1
 
-
     plt.imshow(data_map, extent=(0, data_map.shape[1], 0, data_map.shape[0]))
     plt.show()
 
