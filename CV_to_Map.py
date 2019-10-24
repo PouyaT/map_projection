@@ -10,7 +10,9 @@ import math
 from moviepy.editor import VideoFileClip
 from IPython.display import HTML
 import imageio
+from skimage.transform import resize
 
+map_size = 200
 counter = 0
 scale = -1
 divider = 10
@@ -245,10 +247,10 @@ def map_localization(lines, width, height):
                 data_map[int(row) + 1][int(x_left_list_avg)] = 1
                 print('top', int(row) + 1)
 
-    plt.imshow(data_map, extent=(0, data_map.shape[1], 0, data_map.shape[0]))
-    plt.show()
+    # resizes the image and keeps the ratios the same to the size I want
+    data_map_resized = resize(data_map, (map_size, map_size))
 
-    return data_map
+    return data_map_resized
 
 # takes in height, angle of the camera, and the field of view so the image can given a reference of a distance
 def length_to_ground(height, angle, field_of_view):
