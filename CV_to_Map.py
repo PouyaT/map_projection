@@ -248,10 +248,8 @@ def map_localization(lines, width, height):
 
     return data_map_resized
 
-
 def numpyMap_to_occupancyGrid(data_map):
     msg = OccupancyGrid(info=MapMetaData(width=200,height=200), data = data_map)
-
 
 
 # created my own helper function to round up numbers
