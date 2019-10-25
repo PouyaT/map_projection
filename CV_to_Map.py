@@ -10,7 +10,7 @@ import math
 from moviepy.editor import VideoFileClip
 from IPython.display import HTML
 import imageio
-from skimage.transform import resize
+from skimage.transform import resize, rescale
 
 occupancy_grid = 200
 
@@ -348,14 +348,13 @@ def map_localization(lines, width, height):
     if len(x_right_list) > 0:
         x_right_list_r = list(np.array(x_right_list) / divider)
         # adding half the height for the occupancy grid
-        y_right_list_r = list((np.array(y_right_list) / divider) - height_r/2)
+        y_right_list_r = list((np.array(y_right_list) / divider))
 
     if len(x_left_list) > 0:
         x_left_list_r = list(np.array(x_left_list) / divider)
         # adding half the height for the occupancy grid
-        y_left_list_r = list((np.array(y_left_list) / divider) - height_r/2)
+        y_left_list_r = list((np.array(y_left_list) / divider))
 
-    print(y_left_list_r)
     # creates a 2d array of 6x10 (in this particular case) (row x column)
     data_map = np.zeros(shape=(int(height_r), int(width_r)), dtype=int)
 
@@ -394,9 +393,16 @@ def map_localization(lines, width, height):
     plt.imshow(data_map, extent=(0, data_map.shape[1], 0, data_map.shape[0]))
     plt.show()
 
-    data_map_resized = resize(data_map, (occupancy_grid, occupancy_grid))
-    plt.imshow(data_map, extent=(0, data_map_resized.shape[1], 0, data_map_resized.shape[0]))
+    data_map_resized = cv2.resize(data_map, dsize=(occupancy_grid, occupancy_grid), interpolation=cv2.INTER_NEAREST)
+    # shifts the map by 100, which is where the robot is centered at
+    data_map_resized = np.roll(data_map_resized, 100, axis=0)
+
+    plt.imshow(data_map_resized, extent=(0, data_map_resized.shape[1], 0, data_map_resized.shape[0]))
     plt.show()
+
+
+
+
 
     # # this aves all the images to the particular file directory
     # global counter
