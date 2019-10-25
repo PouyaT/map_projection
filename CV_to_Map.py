@@ -12,7 +12,7 @@ from IPython.display import HTML
 import imageio
 from skimage.transform import resize
 
-map_size = 200
+occupancy_grid = 200
 
 counter = 0
 scale = -1
@@ -347,12 +347,15 @@ def map_localization(lines, width, height):
     # work on this ,maybe go back to what i had
     if len(x_right_list) > 0:
         x_right_list_r = list(np.array(x_right_list) / divider)
-        y_right_list_r = list(np.array(y_right_list) / divider)
+        # adding half the height for the occupancy grid
+        y_right_list_r = list((np.array(y_right_list) / divider) - height_r/2)
 
     if len(x_left_list) > 0:
         x_left_list_r = list(np.array(x_left_list) / divider)
-        y_left_list_r = list(np.array(y_left_list) / divider)
+        # adding half the height for the occupancy grid
+        y_left_list_r = list((np.array(y_left_list) / divider) - height_r/2)
 
+    print(y_left_list_r)
     # creates a 2d array of 6x10 (in this particular case) (row x column)
     data_map = np.zeros(shape=(int(height_r), int(width_r)), dtype=int)
 
@@ -391,7 +394,7 @@ def map_localization(lines, width, height):
     plt.imshow(data_map, extent=(0, data_map.shape[1], 0, data_map.shape[0]))
     plt.show()
 
-    data_map_resized = resize(data_map, (map_size, map_size))
+    data_map_resized = resize(data_map, (occupancy_grid, occupancy_grid))
     plt.imshow(data_map, extent=(0, data_map_resized.shape[1], 0, data_map_resized.shape[0]))
     plt.show()
 
