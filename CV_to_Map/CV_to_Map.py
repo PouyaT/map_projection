@@ -46,11 +46,6 @@ def grass_filter(og_image):
     plt.imshow(result)
     plt.show()
 
-    # cv2.imshow('mask', mask)
-    # cv2.imshow('result', result)
-    # cv2.imshow('opening_test', gradient)
-    # cv2.waitKey()
-
     return result, og_image
 
 
@@ -247,6 +242,7 @@ def map_localization(lines, width, height):
     data_map_resized = resize(data_map, (map_size, map_size))
 
     return data_map_resized
+
 
 def numpyMap_to_occupancyGrid(data_map):
     msg = OccupancyGrid(info=MapMetaData(width=200,height=200), data = data_map)
