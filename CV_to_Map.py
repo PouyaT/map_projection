@@ -397,11 +397,10 @@ def map_localization(lines, width, height):
     # shifts the map by 100, which is where the robot is centered at
     data_map_resized = np.roll(data_map_resized, 100, axis=0)
 
+    print(*data_map_resized)
+
     plt.imshow(data_map_resized, extent=(0, data_map_resized.shape[1], 0, data_map_resized.shape[0]))
     plt.show()
-
-
-
 
 
     # # this aves all the images to the particular file directory
