@@ -8,14 +8,14 @@ from matplotlib import pyplot as plt
 import statistics
 import math
 from skimage.transform import resize
-import rospy
+# import rospy
 
 map_size = 200
 counter = 0
 scale = -1
 divider = 10
 
-grass_image = False
+grass_image = True
 
 
 # returns a filtered image and unfiltered image. This is needed for white lines on green grass
@@ -88,9 +88,8 @@ def pipeline(image):
 
     # used for non-hd video
     region_of_interest_vertices = [
-        (0, height),
-        (width / 2, height / 2 + 70),
-        (width, height),
+        (0, 0), (width, 0),
+        (width, height), (0, height)
     ]
 
     # convert to grayscale
@@ -101,6 +100,10 @@ def pipeline(image):
 
     # crop operation at the end of the cannyed pipeline so cropped edge doesn't get detected
     cropped_image = region_of_interest(cannyed_image, np.array([region_of_interest_vertices], np.int32))
+
+    plt.figure()
+    plt.imshow(cropped_image)
+    plt.show()
 
     # used houghlinesP algo to detect the white lines
     # use threshold=152 for road side image. Test out different stuff for grassy images
@@ -113,9 +116,9 @@ def pipeline(image):
     data_map = map_localization(lines, width, height)
 
     # # this is to display images for testing purpose
-    # plt.figure()
-    # plt.imshow(line_image)
-    # plt.show()
+    plt.figure()
+    plt.imshow(line_image)
+    plt.show()
 
     return data_map
 
@@ -246,10 +249,14 @@ def map_localization(lines, width, height):
     # resize the image and keeps the ratios the same to the size I want
     data_map_resized = resize(data_map, (map_size, map_size))
 
+    # plt.imshow(data_map_resized, extent=(0, data_map_resized.shape[1], 0, data_map_resized.shape[0]))
+    # plt.show()
+
     return data_map_resized
 
-def numpyMap_to_occupancyGrid(data_map):
-    msg = OccupancyGrid(info=MapMetaData(width=200,height=200), data = data_map)
+
+# def numpyMap_to_occupancyGrid(data_map):
+#     msg = OccupancyGrid(info=MapMetaData(width=200, height=200), data=data_map)
 
 
 # created my own helper function to round up numbers
@@ -261,6 +268,7 @@ def round_up(n, decimals):
 if __name__ == '__main__':
     # call pipeline function which will return a data_map which is just a 2d numpy array
     # Need to subscribe to an image node for images data to use
-    data_map = pipeline()
+    image = mpimg.imread("testing_image.jpg")
+    data_map = pipeline(image)
 
 
