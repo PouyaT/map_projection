@@ -8,9 +8,7 @@ from matplotlib import pyplot as plt
 import statistics
 import math
 from moviepy.editor import VideoFileClip
-from IPython.display import HTML
 import imageio
-from skimage.transform import resize, rescale
 
 occupancy_grid = 200
 
