@@ -10,8 +10,6 @@ counter = 0
 scale = -1
 divider = 10
 
-grass_image = False
-
 
 # returns a filtered image and unfiltered image. This is needed for white lines on green grass
 # output are two images, First output is the filtered image, Second output is the original pre-filtered image
@@ -51,16 +49,10 @@ def grass_filter(og_image):
 
 # takes in an image and outputs an image that has redlines overlaying the detected boundries
 def pipeline(image):
-    # flag for seeing if you're dealing with grassy images or not
-    if grass_image:
-        # for white lines on grassy photos need this part for pre-processing before being able to detect white lines
-        img_list = grass_filter(image)
-        pre_or_post_filtered_image = img_list[0]
-        original_overlay_image = img_list[1]
-    else:
-        # need this if testing on actual roads with white lines borders
-        pre_or_post_filtered_image = image
-        original_overlay_image = image
+    # for white lines on grassy photos need this part for pre-processing before being able to detect white lines
+    img_list = grass_filter(image)
+    pre_or_post_filtered_image = img_list[0]
+    original_overlay_image = img_list[1]
 
     # gives the height and width of the image from the dimensions given
     height = image.shape[0]
@@ -182,66 +174,71 @@ def map_localization(lines, width, height):
     height_r = height_r / divider
     width_r = width_r / divider
 
-    # populates two lists with x and y values
-    for line in lines:
-        for x1, y1, x2, y2 in line:
-            # if the x location of the pixel is less than 500 then it's the left line
-            # this if statement will need to change based on video footage
-            if x1 < 500:
-                x_left_list.extend([x1, x2])
-                y_left_list.extend([y1, y2])
-            else:
-                x_right_list.extend([x1, x2])
-                y_right_list.extend([y1, y2])
+    # error checking to see that if lines do in fact exists
+    try:
+        # populates two lists with x and y values
+        for line in lines:
+            for x1, y1, x2, y2 in line:
+                # if the x location of the pixel is less than 500 then it's the left line
+                # this if statement will need to change based on video footage
+                if x1 < 500:
+                    x_left_list.extend([x1, x2])
+                    y_left_list.extend([y1, y2])
+                else:
+                    x_right_list.extend([x1, x2])
+                    y_right_list.extend([y1, y2])
 
-    # makes sure the list isn't empty before trying to round
-    # creating np arrays from original right and left line lists
-    # then using np's built in functions to round
-    # and turning them back into normal lists
-    # work on this ,maybe go back to what i had
-    if len(x_right_list) > 0:
-        x_right_list_r = list(np.array(x_right_list) / divider)
-        # adding half the height for the occupancy grid
-        y_right_list_r = list((np.array(y_right_list) / divider))
+        # makes sure the list isn't empty before trying to round
+        # creating np arrays from original right and left line lists
+        # then using np's built in functions to round
+        # and turning them back into normal lists
+        # work on this ,maybe go back to what i had
+        if len(x_right_list) > 0:
+            x_right_list_r = list(np.array(x_right_list) / divider)
+            # adding half the height for the occupancy grid
+            y_right_list_r = list((np.array(y_right_list) / divider))
 
-    if len(x_left_list) > 0:
-        x_left_list_r = list(np.array(x_left_list) / divider)
-        # adding half the height for the occupancy grid
-        y_left_list_r = list((np.array(y_left_list) / divider))
+        if len(x_left_list) > 0:
+            x_left_list_r = list(np.array(x_left_list) / divider)
+            # adding half the height for the occupancy grid
+            y_left_list_r = list((np.array(y_left_list) / divider))
 
-    # creates a 2d array of 6x10 (in this particular case) (row x column)
-    data_map = np.zeros(shape=(int(height_r), int(width_r)), dtype=int)
+        # creates a 2d array of widthxheight (in this particular case) (row x column)
+        data_map = np.zeros(shape=(int(height_r), int(width_r)), dtype=int)
 
-    # error checking
-    if len(x_right_list) > 0:
-        # gets the average of the x on the left and right sides
-        # I'm doing this so I can get a consistent line
-        x_right_list_avg = np.mean(x_right_list_r)
-        # loops through the x and y coordinates and places a 1 on the map representing the line from the image
-        for row in y_right_list_r:
-            data_map[int(row)][int(x_right_list_avg)] = 1
+        # error checking
+        if len(x_right_list) > 0:
+            # gets the average of the x on the left and right sides
+            # I'm doing this so I can get a consistent line
+            x_right_list_avg = np.mean(x_right_list_r)
+            # loops through the x and y coordinates and places a 1 on the map representing the line from the image
+            for row in y_right_list_r:
+                data_map[int(row)][int(x_right_list_avg)] = 1
 
-            for i in range(4):
-                # checks i below and above to fill in any gaps that might have been missed
-                if 0 < int(row) - i and data_map[int(row)][int(x_right_list_avg)] == 1:
-                    data_map[int(row) - i][int(x_right_list_avg)] = 1
+                for i in range(4):
+                    # checks i below and above to fill in any gaps that might have been missed
+                    if 0 < int(row) - i and data_map[int(row)][int(x_right_list_avg)] == 1:
+                        data_map[int(row) - i][int(x_right_list_avg)] = 1
 
-                if int(row) + i < height_r and data_map[int(row)][int(x_right_list_avg)] == 1:
-                    data_map[int(row) + i][int(x_right_list_avg)] = 1
+                    if int(row) + i < height_r and data_map[int(row)][int(x_right_list_avg)] == 1:
+                        data_map[int(row) + i][int(x_right_list_avg)] = 1
 
-    # populates left side of the map
-    if len(x_left_list) > 0:
-        x_left_list_avg = np.mean(x_left_list_r)
-        for row in y_left_list_r:
-            data_map[int(row)][int(x_left_list_avg)] = 1
+        # populates left side of the map
+        if len(x_left_list) > 0:
+            x_left_list_avg = np.mean(x_left_list_r)
+            for row in y_left_list_r:
+                data_map[int(row)][int(x_left_list_avg)] = 1
 
-            for i in range(4):
-                # checks i below and above to fill in any gaps that might have been missed
-                if 0 < int(row) - i and data_map[int(row)][int(x_left_list_avg)] == 1:
-                    data_map[int(row) - i][int(x_left_list_avg)] = 1
+                for i in range(4):
+                    # checks i below and above to fill in any gaps that might have been missed
+                    if 0 < int(row) - i and data_map[int(row)][int(x_left_list_avg)] == 1:
+                        data_map[int(row) - i][int(x_left_list_avg)] = 1
 
-                if int(row) + i < height_r and data_map[int(row)][int(x_left_list_avg)] == 1:
-                    data_map[int(row) + i][int(x_left_list_avg)] = 1
+                    if int(row) + i < height_r and data_map[int(row)][int(x_left_list_avg)] == 1:
+                        data_map[int(row) + i][int(x_left_list_avg)] = 1
+    # if there is a null error then set the data_map to be empty
+    except TypeError:
+        data_map = np.zeros(shape=(int(height_r), int(width_r)), dtype=int)
 
     # changes the map so it's more keen on how humans read maps. The original numpy array has 0,0 as the top left corner
     plt.imshow(data_map, extent=(0, data_map.shape[1], 0, data_map.shape[0]))
