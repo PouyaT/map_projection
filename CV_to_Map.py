@@ -1,21 +1,16 @@
 import os
 import cv2
 import numpy as np
-import matplotlib
-#matplotlib.use('Agg')
-import matplotlib.image as mpimg
 from matplotlib import pyplot as plt
-import statistics
 import math
-from skimage.transform import resize
-# import rospy
 
-map_size = 200
+occupancy_grid_size = 200
+
 counter = 0
 scale = -1
 divider = 10
 
-grass_image = True
+grass_image = False
 
 
 # returns a filtered image and unfiltered image. This is needed for white lines on green grass
@@ -46,12 +41,16 @@ def grass_filter(og_image):
     plt.imshow(result)
     plt.show()
 
+    # cv2.imshow('mask', mask)
+    # cv2.imshow('result', result)
+    # cv2.imshow('opening_test', gradient)
+    # cv2.waitKey()
+
     return result, og_image
 
 
 # takes in an image and outputs an image that has redlines overlaying the detected boundries
 def pipeline(image):
-
     # flag for seeing if you're dealing with grassy images or not
     if grass_image:
         # for white lines on grassy photos need this part for pre-processing before being able to detect white lines
@@ -83,8 +82,9 @@ def pipeline(image):
 
     # used for non-hd video
     region_of_interest_vertices = [
-        (0, 0), (width, 0),
-        (width, height), (0, height)
+        (0, height),
+        (width / 2, height / 2 + 70),
+        (width, height),
     ]
 
     # convert to grayscale
@@ -96,10 +96,6 @@ def pipeline(image):
     # crop operation at the end of the cannyed pipeline so cropped edge doesn't get detected
     cropped_image = region_of_interest(cannyed_image, np.array([region_of_interest_vertices], np.int32))
 
-    plt.figure()
-    plt.imshow(cropped_image)
-    plt.show()
-
     # used houghlinesP algo to detect the white lines
     # use threshold=152 for road side image. Test out different stuff for grassy images
     lines = cv2.HoughLinesP(cropped_image, rho=6, theta=np.pi / 60, threshold=75,
@@ -107,20 +103,23 @@ def pipeline(image):
 
     line_image = draw_lines(original_overlay_image, lines)
 
-    # takes in the returned value of the map_localization which is a 2d array
-    data_map = map_localization(lines, width, height)
+    # gets the centered x and y location of the current frame
+    # currently not used
+    # frame_x_loc, frame_y_loc = current_x_n_y_loc(lines)
+
+    map_localization(lines, width, height)
 
     # # this is to display images for testing purpose
     plt.figure()
     plt.imshow(line_image)
     plt.show()
 
-    return data_map
+    return line_image
 
 
-# takes in an image and a list of points (vertices) to crop the image
+# takes in an image and a list of points (vertices)matplotlib.use('agg')to crop the image
 def region_of_interest(img, vertices):
-    # define a blank matrix that matches the iamge height/width.
+    # define a blank matrix that matches the iamge matplotlib.use('agg')eight/width.
     mask = np.zeros_like(img)
 
     # Create a match color for gray scalled images
@@ -137,7 +136,7 @@ def region_of_interest(img, vertices):
 
 # teaks in an image, a list of lines from HoughedLinesP and draws red lines on top of the passed in image
 # outputs the images
-def draw_lines(img, lines, color=[255,0,0], thickness=3):
+def draw_lines(img, lines, color=[255, 0, 0], thickness=3):
     # If there are no lines to draw, exit
     if lines is None:
         return
@@ -146,7 +145,7 @@ def draw_lines(img, lines, color=[255,0,0], thickness=3):
     img = np.copy(img)
 
     # create a blank image that matches the original in size
-    line_img = np.zeros((img.shape[0], img.shape[1], 3), dtype=np.uint8,)
+    line_img = np.zeros((img.shape[0], img.shape[1], 3), dtype=np.uint8, )
 
     # loop over all lines and draw them on the blank image
     for line in lines:
@@ -162,7 +161,7 @@ def draw_lines(img, lines, color=[255,0,0], thickness=3):
 
 # the if statement that determines what is left or right lane will need to change based on video footage
 def map_localization(lines, width, height):
-
+    global occupancy_grid_size
     global scale
     global divider
 
@@ -202,11 +201,13 @@ def map_localization(lines, width, height):
     # work on this ,maybe go back to what i had
     if len(x_right_list) > 0:
         x_right_list_r = list(np.array(x_right_list) / divider)
-        y_right_list_r = list(np.array(y_right_list) / divider)
+        # adding half the height for the occupancy grid
+        y_right_list_r = list((np.array(y_right_list) / divider))
 
     if len(x_left_list) > 0:
         x_left_list_r = list(np.array(x_left_list) / divider)
-        y_left_list_r = list(np.array(y_left_list) / divider)
+        # adding half the height for the occupancy grid
+        y_left_list_r = list((np.array(y_left_list) / divider))
 
     # creates a 2d array of 6x10 (in this particular case) (row x column)
     data_map = np.zeros(shape=(int(height_r), int(width_r)), dtype=int)
@@ -215,7 +216,7 @@ def map_localization(lines, width, height):
     if len(x_right_list) > 0:
         # gets the average of the x on the left and right sides
         # I'm doing this so I can get a consistent line
-        x_right_list_avg = statistics.mean(x_right_list_r)
+        x_right_list_avg = np.mean(x_right_list_r)
         # loops through the x and y coordinates and places a 1 on the map representing the line from the image
         for row in y_right_list_r:
             data_map[int(row)][int(x_right_list_avg)] = 1
@@ -230,7 +231,7 @@ def map_localization(lines, width, height):
 
     # populates left side of the map
     if len(x_left_list) > 0:
-        x_left_list_avg = statistics.mean(x_left_list_r)
+        x_left_list_avg = np.mean(x_left_list_r)
         for row in y_left_list_r:
             data_map[int(row)][int(x_left_list_avg)] = 1
 
@@ -241,25 +242,31 @@ def map_localization(lines, width, height):
 
                 if int(row) + i < height_r and data_map[int(row)][int(x_left_list_avg)] == 1:
                     data_map[int(row) + i][int(x_left_list_avg)] = 1
-    # resize the image and keeps the ratios the same to the size I want
-    data_map_resized = resize(data_map, (map_size, map_size))
 
-    # plt.imshow(data_map_resized, extent=(0, data_map_resized.shape[1], 0, data_map_resized.shape[0]))
-    # plt.show()
+    # changes the map so it's more keen on how humans read maps. The original numpy array has 0,0 as the top left corner
+    plt.imshow(data_map, extent=(0, data_map.shape[1], 0, data_map.shape[0]))
+    plt.show()
 
-    return data_map_resized
+    data_map_resized = cv2.resize(data_map, dsize=(occupancy_grid_size, occupancy_grid_size),
+                                  interpolation=cv2.INTER_NEAREST)
+    # shifts the map by 100, which is where the robot is centered at
+    data_map_resized = np.roll(data_map_resized, 100, axis=0)
+
+    plt.imshow(data_map_resized, extent=(0, data_map_resized.shape[1], 0, data_map_resized.shape[0]))
+    plt.show()
+
+    # created my own helper function to round up numbers
 
 
-# created my own helper function to round up numbers
 def round_up(n, decimals):
     multiplier = 10 ** decimals
     return math.ceil(n * multiplier) / multiplier
 
 
-if __name__ == '__main__':
-    # call pipeline function which will return a data_map which is just a 2d numpy array
-    # Need to subscribe to an image node for images data to use
-    image = mpimg.imread("testing_image.jpg")
-    data_map = pipeline(image)
+if __name__ == "__main__":
+    image = cv2.imread("testing_image.jpg")
+    image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
+    pipeline(image)
+
 
 
