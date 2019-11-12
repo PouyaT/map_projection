@@ -22,7 +22,7 @@ def grass_filter(og_image):
     lower = np.array([0, 0, 200])
     # create an upper bound for a pixel values
     upper = np.array([179, 77, 255])
-    # detects all white pixels wihin the range specified earlier
+    # detects all white pixels within the range specified earlier
     mask = cv2.inRange(img, lower, upper)
     result = cv2.bitwise_and(result, result, mask=mask)
 
@@ -36,9 +36,9 @@ def grass_filter(og_image):
 
     gradient = cv2.morphologyEx(mask, cv2.MORPH_GRADIENT, kernel)
 
-    plt.imshow(result)
-    plt.show()
-
+    # plt.imshow(result)
+    # plt.show()
+    #
     # cv2.imshow('mask', mask)
     # cv2.imshow('result', result)
     # cv2.imshow('opening_test', gradient)
@@ -73,10 +73,18 @@ def pipeline(image):
     # ]
 
     # used for non-hd video
+    # region_of_interest_vertices = [
+    #     (0, height),
+    #     (width / 2, height / 2 + 70),
+    #     (width, height),
+    # ]
+
+    # four corner region_of_interest
     region_of_interest_vertices = [
-        (0, height),
-        (width / 2, height / 2 + 70),
+        (0, 0),
+        (width, 0),
         (width, height),
+        (0, height)
     ]
 
     # convert to grayscale
@@ -88,9 +96,15 @@ def pipeline(image):
     # crop operation at the end of the cannyed pipeline so cropped edge doesn't get detected
     cropped_image = region_of_interest(cannyed_image, np.array([region_of_interest_vertices], np.int32))
 
+    # get the birds eye view for the image
+    original_overlay_image, birds_image = birds_eye_view(original_overlay_image, cropped_image)
+
     # used houghlinesP algo to detect the white lines
     # use threshold=152 for road side image. Test out different stuff for grassy images
-    lines = cv2.HoughLinesP(cropped_image, rho=6, theta=np.pi / 60, threshold=75,
+    # lines = cv2.HoughLinesP(cropped_image, rho=6, theta=np.pi / 60, threshold=40,
+    #                         lines=np.array([]), minLineLength=40, maxLineGap=25)
+
+    lines = cv2.HoughLinesP(birds_image, rho=6, theta=np.pi / 60, threshold=40,
                             lines=np.array([]), minLineLength=40, maxLineGap=25)
 
     line_image = draw_lines(original_overlay_image, lines)
@@ -99,22 +113,22 @@ def pipeline(image):
     # currently not used
     # frame_x_loc, frame_y_loc = current_x_n_y_loc(lines)
 
-    map_localization(lines, width, height)
-
     # # this is to display images for testing purpose
     plt.figure()
     plt.imshow(line_image)
     plt.show()
+
+    map_localization(lines, width, height)
 
     return line_image
 
 
 # takes in an image and a list of points (vertices)matplotlib.use('agg')to crop the image
 def region_of_interest(img, vertices):
-    # define a blank matrix that matches the iamge matplotlib.use('agg')eight/width.
+    # define a blank matrix that matches the image matplotlib.use('agg')eight/width.
     mask = np.zeros_like(img)
 
-    # Create a match color for gray scalled images
+    # Create a match color for gray scaled images
     match_mask_color = 255
 
     # Fill inside the polygon
@@ -123,12 +137,15 @@ def region_of_interest(img, vertices):
     # Returning the image only where mask pixels match
     masked_image = cv2.bitwise_and(img, mask)
 
+    cv2.imshow("masked image", masked_image)
+    cv2.waitKey()
+
     return masked_image
 
 
 # teaks in an image, a list of lines from HoughedLinesP and draws red lines on top of the passed in image
 # outputs the images
-def draw_lines(img, lines, color=[255, 0, 0], thickness=3):
+def draw_lines(img, lines, color=[255, 0, 0], thickness=6):
     # If there are no lines to draw, exit
     if lines is None:
         return
@@ -137,18 +154,56 @@ def draw_lines(img, lines, color=[255, 0, 0], thickness=3):
     img = np.copy(img)
 
     # create a blank image that matches the original in size
-    line_img = np.zeros((img.shape[0], img.shape[1], 3), dtype=np.uint8, )
+    line_img = np.zeros((img.shape[0], img.shape[1], 3), dtype=np.uint8)
 
     # loop over all lines and draw them on the blank image
     for line in lines:
         for x1, y1, x2, y2 in line:
             cv2.line(line_img, (x1, y1), (x2, y2), color, thickness)
 
-    # Merge the image with the lines on the orginal
+    # Merge the image with the lines on the original
     img = cv2.addWeighted(img, 0.8, line_img, 1.0, 0.0)
 
     # return the modified image
     return img
+
+
+def birds_eye_view(og_img, filtered_image):
+
+    # gives the height and width of the image from the dimensions given
+    IMAGE_H = og_img.shape[0]
+    IMAGE_W = og_img.shape[1]
+    IMG_SIZE = og_img.shape[::-1][1:]
+
+    OFFSET = 150
+
+    PRES_SRC_PNTS = np.float32([
+        (400, 210),  # Top-left corner
+        (180, 520),  # Bottom-left corner
+        (IMAGE_W, 520),  # Bottom-right corner
+        (IMAGE_W, 210)  # Top-right corner
+    ])
+
+    PRES_DST_PNTS = np.float32([
+        [OFFSET, 0],
+        [OFFSET, IMAGE_H],
+        [IMAGE_W - OFFSET, IMAGE_H],
+        [IMAGE_W - OFFSET, 0]
+    ])
+
+    M = cv2.getPerspectiveTransform(PRES_SRC_PNTS, PRES_DST_PNTS)
+    M_INV = cv2.getPerspectiveTransform(PRES_DST_PNTS, PRES_SRC_PNTS)
+
+    og_warped = cv2.warpPerspective(og_img, M, IMG_SIZE, flags=cv2.INTER_LINEAR)
+    filtered_warped = cv2.warpPerspective(filtered_image, M, IMG_SIZE, flags=cv2.INTER_LINEAR)
+    og_warped_correct_colors = cv2.cvtColor(og_warped, cv2.COLOR_BGR2RGB)
+
+    cv2.imshow('original warped', og_warped)
+    cv2.imshow('filtered warped', filtered_warped)
+    cv2.imshow('original warped right color', og_warped_correct_colors)
+    cv2.waitKey()
+
+    return og_warped, filtered_warped
 
 
 # the if statement that determines what is left or right lane will need to change based on video footage
@@ -203,8 +258,11 @@ def map_localization(lines, width, height):
             # adding half the height for the occupancy grid
             y_left_list_r = list((np.array(y_left_list) / divider))
 
-        # creates a 2d array of widthxheight (in this particular case) (row x column)
+        # creates a 2d array of width height (in this particular case) (row x column)
         data_map = np.zeros(shape=(int(height_r), int(width_r)), dtype=int)
+
+        print(x_left_list_r)
+        print(x_right_list_r)
 
         # error checking
         if len(x_right_list) > 0:
@@ -213,29 +271,31 @@ def map_localization(lines, width, height):
             x_right_list_avg = np.mean(x_right_list_r)
             # loops through the x and y coordinates and places a 1 on the map representing the line from the image
             for row in y_right_list_r:
-                data_map[int(row)][int(x_right_list_avg)] = 1
+                for col in x_right_list_r:
+                    data_map[int(row)][int(col)] = 1
 
-                for i in range(4):
-                    # checks i below and above to fill in any gaps that might have been missed
-                    if 0 < int(row) - i and data_map[int(row)][int(x_right_list_avg)] == 1:
-                        data_map[int(row) - i][int(x_right_list_avg)] = 1
-
-                    if int(row) + i < height_r and data_map[int(row)][int(x_right_list_avg)] == 1:
-                        data_map[int(row) + i][int(x_right_list_avg)] = 1
+                # for i in range(4):
+                #     # checks i below and above to fill in any gaps that might have been missed
+                #     if 0 < int(row) - i and data_map[int(row)][int(x_right_list_avg)] == 1:
+                #         data_map[int(row) - i][int(x_right_list_avg)] = 1
+                #
+                #     if int(row) + i < height_r and data_map[int(row)][int(x_right_list_avg)] == 1:
+                #         data_map[int(row) + i][int(x_right_list_avg)] = 1
 
         # populates left side of the map
         if len(x_left_list) > 0:
             x_left_list_avg = np.mean(x_left_list_r)
             for row in y_left_list_r:
-                data_map[int(row)][int(x_left_list_avg)] = 1
+                for col in x_left_list_r:
+                    data_map[int(row)][int(col)] = 1
 
-                for i in range(4):
-                    # checks i below and above to fill in any gaps that might have been missed
-                    if 0 < int(row) - i and data_map[int(row)][int(x_left_list_avg)] == 1:
-                        data_map[int(row) - i][int(x_left_list_avg)] = 1
-
-                    if int(row) + i < height_r and data_map[int(row)][int(x_left_list_avg)] == 1:
-                        data_map[int(row) + i][int(x_left_list_avg)] = 1
+                # for i in range(4):
+                #     # checks i below and above to fill in any gaps that might have been missed
+                #     if 0 < int(row) - i and data_map[int(row)][int(x_left_list_avg)] == 1:
+                #         data_map[int(row) - i][int(x_left_list_avg)] = 1
+                #
+                #     if int(row) + i < height_r and data_map[int(row)][int(x_left_list_avg)] == 1:
+                #         data_map[int(row) + i][int(x_left_list_avg)] = 1
     # if there is a null error then set the data_map to be empty
     except TypeError:
         data_map = np.zeros(shape=(int(height_r), int(width_r)), dtype=int)
@@ -261,7 +321,7 @@ def round_up(n, decimals):
 
 
 if __name__ == "__main__":
-    image = cv2.imread("testing_image.jpg")
+    image = cv2.imread("IGVC_2.PNG")
     image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
     pipeline(image)
 
