@@ -321,7 +321,7 @@ def round_up(n, decimals):
 
 
 if __name__ == "__main__":
-    image = cv2.imread("IGVC_2.PNG")
+    image = cv2.imread("IGVC_0.PNG")
     image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
     pipeline(image)
 
